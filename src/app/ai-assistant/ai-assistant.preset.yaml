@@ -1,0 +1,11 @@
+name: ai-assistant
+displayName: AI Assistant
+description: AI Assistant
+apps:
+  - ai-assistant
+categories:
+  - ai
+  - utility
+config:
+  - name: ai-assistant
+    app: ai-assistant

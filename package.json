@@ -1,0 +1,50 @@
+{
+  "name": "@ale-run/plugin-ai",
+  "version": "0.1.0",
+  "description": "Ale Plugin - AI",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "repository": "ale-run/plugin-ai",
+  "scripts": {
+    "prepublishOnly": "npm run dist",
+    "dev": "npm run build && cross-env LOG_LEVEL=info aled dev",
+    "build": "npm run build:ui && npm run build:ts",
+    "build:ts": "rimraf lib && copyfiles -u 1 src/**/*.yaml src/**/*.svg lib && tsc",
+    "build:ui": "cd ui && npm run build",
+    "watch": "concurrently \"npm run watch:ts\" \"npm run watch:ui\"",
+    "watch:ts": "rimraf lib && copyfiles -u 1 src/**/*.yaml src/**/*.svg lib && tsc -w --preserveWatchOutput",
+    "watch:ui": "cd ui && npm run watch",
+    "dist": "npm run build:ts && npm run build:ui && ncc build src/index.ts -ms -e \"@ale-run/runtime\" -o lib"
+  },
+  "devDependencies": {
+    "@ale-run/runtime": "latest",
+    "@langchain/community": "^0.3.35",
+    "@mistralai/mistralai": "^1.5.1",
+    "@modelcontextprotocol/sdk": "^1.1.1",
+    "@mendable/firecrawl-js": "^1.19.1",
+    "@tavily/core": "^0.3.1",
+    "@vercel/ncc": "^0.38.3",
+    "ansi-colors": "^4.1.3",
+    "es6-template-string": "^1.2.0",
+    "express": "^4.17.1",
+    "express-asyncify": "^1.0.1",
+    "websocket-stream": "^5.5.2",
+    "openai": "^4.86.2",
+    "mongodb": "^5.2.0",
+    "ws": "^8.16.0",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.2",
+    "copyfiles": "^2.4.1",
+    "pdf-parse": "^1.1.1",
+    "prettier": "^2.0.4",
+    "tslint": "^6.1.3",
+    "rimraf": "^3.0.2",
+    "typescript": "^5.5.4"
+  },
+  "files": [
+    "ale.plugin.yaml",
+    "ale.svg",
+    "lib",
+    "ui/dist"
+  ]
+}

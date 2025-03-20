@@ -1,0 +1,383 @@
+import { Provider, Answer, ThreadInfo, AssistantInfo, AnyObject, Attach, Logger, Ask, RunResult, Icon } from '../../../spec';
+import OpenAI from 'openai';
+import fs from 'fs';
+import { PassThrough } from 'stream';
+
+const logger = Logger.getLogger('ai:openai');
+
+enum RESPONSE_FORMATS {
+  text = 'text',
+  auto = 'auto',
+  object = 'json_object'
+}
+
+export class OpenAIProvider extends Provider {
+  public readonly displayName = 'OpenAI';
+  public readonly icon: Icon = {
+    src: 'data:image/svg+xml;base64,PHN2ZyBoZWlnaHQ9IjI1MDAiIHZpZXdCb3g9Ii0xIC0uMSA5NDkuMSA5NTkuOCIgd2lkdGg9IjI0NzQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Cgk8cGF0aCBkPSJtOTI1LjggNDU2LjNjMTAuNCAyMy4yIDE3IDQ4IDE5LjcgNzMuMyAyLjYgMjUuMyAxLjMgNTAuOS00LjEgNzUuOC01LjMgMjQuOS0xNC41IDQ4LjgtMjcuMyA3MC44LTguNCAxNC43LTE4LjMgMjguNS0yOS43IDQxLjItMTEuMyAxMi42LTIzLjkgMjQtMzcuNiAzNC0xMy44IDEwLTI4LjUgMTguNC00NC4xIDI1LjMtMTUuNSA2LjgtMzEuNyAxMi00OC4zIDE1LjQtNy44IDI0LjItMTkuNCA0Ny4xLTM0LjQgNjcuNy0xNC45IDIwLjYtMzMgMzguNy01My42IDUzLjYtMjAuNiAxNS00My40IDI2LjYtNjcuNiAzNC40LTI0LjIgNy45LTQ5LjUgMTEuOC03NSAxMS44LTE2LjkuMS0zMy45LTEuNy01MC41LTUuMS0xNi41LTMuNS0zMi43LTguOC00OC4yLTE1LjdzLTMwLjItMTUuNS00My45LTI1LjVjLTEzLjYtMTAtMjYuMi0yMS41LTM3LjQtMzQuMi0yNSA1LjQtNTAuNiA2LjctNzUuOSA0LjEtMjUuMy0yLjctNTAuMS05LjMtNzMuNC0xOS43LTIzLjItMTAuMy00NC43LTI0LjMtNjMuNi00MS40cy0zNS0zNy4xLTQ3LjctNTkuMWMtOC41LTE0LjctMTUuNS0zMC4yLTIwLjgtNDYuM3MtOC44LTMyLjctMTAuNi00OS42Yy0xLjgtMTYuOC0xLjctMzMuOC4xLTUwLjcgMS44LTE2LjggNS41LTMzLjQgMTAuOC00OS41LTE3LTE4LjktMzEtNDAuNC00MS40LTYzLjYtMTAuMy0yMy4zLTE3LTQ4LTE5LjYtNzMuMy0yLjctMjUuMy0xLjMtNTAuOSA0LTc1LjhzMTQuNS00OC44IDI3LjMtNzAuOGM4LjQtMTQuNyAxOC4zLTI4LjYgMjkuNi00MS4yczI0LTI0IDM3LjctMzQgMjguNS0xOC41IDQ0LTI1LjNjMTUuNi02LjkgMzEuOC0xMiA0OC40LTE1LjQgNy44LTI0LjMgMTkuNC00Ny4xIDM0LjMtNjcuNyAxNS0yMC42IDMzLjEtMzguNyA1My43LTUzLjcgMjAuNi0xNC45IDQzLjQtMjYuNSA2Ny42LTM0LjQgMjQuMi03LjggNDkuNS0xMS44IDc1LTExLjcgMTYuOS0uMSAzMy45IDEuNiA1MC41IDUuMXMzMi44IDguNyA0OC4zIDE1LjZjMTUuNSA3IDMwLjIgMTUuNSA0My45IDI1LjUgMTMuNyAxMC4xIDI2LjMgMjEuNSAzNy41IDM0LjIgMjQuOS01LjMgNTAuNS02LjYgNzUuOC00czUwIDkuMyA3My4zIDE5LjZjMjMuMiAxMC40IDQ0LjcgMjQuMyA2My42IDQxLjQgMTguOSAxNyAzNSAzNi45IDQ3LjcgNTkgOC41IDE0LjYgMTUuNSAzMC4xIDIwLjggNDYuMyA1LjMgMTYuMSA4LjkgMzIuNyAxMC42IDQ5LjYgMS44IDE2LjkgMS44IDMzLjktLjEgNTAuOC0xLjggMTYuOS01LjUgMzMuNS0xMC44IDQ5LjYgMTcuMSAxOC45IDMxIDQwLjMgNDEuNCA2My42em0tMzMzLjIgNDI2LjljMjEuOC05IDQxLjYtMjIuMyA1OC4zLTM5czMwLTM2LjUgMzktNTguNGM5LTIxLjggMTMuNy00NS4yIDEzLjctNjguOHYtMjIzcS0uMS0uMy0uMi0uNy0uMS0uMy0uMy0uNi0uMi0uMy0uNS0uNS0uMy0uMy0uNi0uNGwtODAuNy00Ni42djI2OS40YzAgMi43LS40IDUuNS0xLjEgOC4xLS43IDIuNy0xLjcgNS4yLTMuMSA3LjZzLTMgNC42LTUgNi41YTMyLjEgMzIuMSAwIDAgMSAtNi41IDVsLTE5MS4xIDExMC4zYy0xLjYgMS00LjMgMi40LTUuNyAzLjIgNy45IDYuNyAxNi41IDEyLjYgMjUuNSAxNy44IDkuMSA1LjIgMTguNSA5LjYgMjguMyAxMy4yIDkuOCAzLjUgMTkuOSA2LjIgMzAuMSA4IDEwLjMgMS44IDIwLjcgMi43IDMxLjEgMi43IDIzLjYgMCA0Ny00LjcgNjguOC0xMy44em0tNDU1LjEtMTUxLjRjMTEuOSAyMC41IDI3LjYgMzguMyA0Ni4zIDUyLjcgMTguOCAxNC40IDQwLjEgMjQuOSA2Mi45IDMxczQ2LjYgNy43IDcwIDQuNiA0NS45LTEwLjcgNjYuNC0yMi41bDE5My4yLTExMS41LjUtLjVxLjItLjIuMy0uNi4yLS4zLjMtLjZ2LTk0bC0yMzMuMiAxMzQuOWMtMi40IDEuNC00LjkgMi40LTcuNSAzLjItMi43LjctNS40IDEtOC4yIDEtMi43IDAtNS40LS4zLTguMS0xLTIuNi0uOC01LjItMS44LTcuNi0zLjJsLTE5MS4xLTExMC40Yy0xLjctMS00LjItMi41LTUuNi0zLjQtMS44IDEwLjMtMi43IDIwLjctMi43IDMxLjFzMSAyMC44IDIuOCAzMS4xYzEuOCAxMC4yIDQuNiAyMC4zIDguMSAzMC4xIDMuNiA5LjggOCAxOS4yIDEzLjIgMjguMnptLTUwLjItNDE3Yy0xMS44IDIwLjUtMTkuNCA0My4xLTIyLjUgNjYuNXMtMS41IDQ3LjEgNC42IDcwYzYuMSAyMi44IDE2LjYgNDQuMSAzMSA2Mi45IDE0LjQgMTguNyAzMi4zIDM0LjQgNTIuNyA0Ni4ybDE5My4xIDExMS42cS4zLjEuNy4yaC43cS40IDAgLjctLjIuMy0uMS42LS4zbDgxLTQ2LjgtMjMzLjItMTM0LjZjLTIuMy0xLjQtNC41LTMuMS02LjUtNWEzMi4xIDMyLjEgMCAwIDEgLTUtNi41Yy0xLjMtMi40LTIuNC00LjktMy4xLTcuNi0uNy0yLjYtMS4xLTUuMy0xLTguMXYtMjI3LjFjLTkuOCAzLjYtMTkuMyA4LTI4LjMgMTMuMi05IDUuMy0xNy41IDExLjMtMjUuNSAxOC03LjkgNi43LTE1LjMgMTQuMS0yMiAyMi4xLTYuNyA3LjktMTIuNiAxNi41LTE3LjggMjUuNXptNjYzLjMgMTU0LjRjMi40IDEuNCA0LjYgMyA2LjYgNSAxLjkgMS45IDMuNiA0LjEgNSA2LjUgMS4zIDIuNCAyLjQgNSAzLjEgNy42LjYgMi43IDEgNS40LjkgOC4ydjIyNy4xYzMyLjEtMTEuOCA2MC4xLTMyLjUgODAuOC01OS43IDIwLjgtMjcuMiAzMy4zLTU5LjcgMzYuMi05My43cy0zLjktNjguMi0xOS43LTk4LjUtMzkuOS01NS41LTY5LjUtNzIuNWwtMTkzLjEtMTExLjZxLS4zLS4xLS43LS4yaC0uN3EtLjMuMS0uNy4yLS4zLjEtLjYuM2wtODAuNiA0Ni42IDIzMy4yIDEzNC43em04MC41LTEyMWgtLjF2LjF6bS0uMS0uMWM1LjgtMzMuNiAxLjktNjguMi0xMS4zLTk5LjctMTMuMS0zMS41LTM1LTU4LjYtNjMtNzguMi0yOC0xOS41LTYxLTMwLjctOTUuMS0zMi4yLTM0LjItMS40LTY4IDYuOS05Ny42IDIzLjlsLTE5My4xIDExMS41cS0uMy4yLS41LjVsLS40LjZxLS4xLjMtLjIuNy0uMS4zLS4xLjd2OTMuMmwyMzMuMi0xMzQuN2MyLjQtMS40IDUtMi40IDcuNi0zLjIgMi43LS43IDUuNC0xIDguMS0xIDIuOCAwIDUuNS4zIDguMiAxIDIuNi44IDUuMSAxLjggNy41IDMuMmwxOTEuMSAxMTAuNGMxLjcgMSA0LjIgMi40IDUuNiAzLjN6bS01MDUuMy0xMDMuMmMwLTIuNy40LTUuNCAxLjEtOC4xLjctMi42IDEuNy01LjIgMy4xLTcuNiAxLjQtMi4zIDMtNC41IDUtNi41IDEuOS0xLjkgNC4xLTMuNiA2LjUtNC45bDE5MS4xLTExMC4zYzEuOC0xLjEgNC4zLTIuNSA1LjctMy4yLTI2LjItMjEuOS01OC4yLTM1LjktOTIuMS00MC4yLTMzLjktNC40LTY4LjMgMS05OS4yIDE1LjUtMzEgMTQuNS01Ny4yIDM3LjYtNzUuNSA2Ni40LTE4LjMgMjguOS0yOCA2Mi4zLTI4IDk2LjV2MjIzcS4xLjQuMi43LjEuMy4zLjYuMi4zLjUuNi4yLjIuNi40bDgwLjcgNDYuNnptNDMuOCAyOTQuNyAxMDMuOSA2MCAxMDMuOS02MHYtMTE5LjlsLTEwMy44LTYwLTEwMy45IDYweiIgLz4KPC9zdmc+Cg==',
+    background: '#ffffff',
+    scale: 0.7,
+    shape: 'circle'
+  };
+  private _openai: OpenAI;
+
+  constructor(options: AnyObject) {
+    super(options);
+  }
+
+  public get openai(): OpenAI {
+    if (this._openai) return this._openai;
+
+    const options = this.options;
+    if (!options?.apikey) throw new Error('OpenAI API Key is missing or empty, please contact the administrator.');
+
+    this._openai = new OpenAI({
+      apiKey: options?.apikey,
+      baseURL: options?.baseURL
+    });
+
+    return this._openai;
+  }
+
+  public async create(info: AssistantInfo): Promise<AnyObject> {
+    if (!info) throw new Error(`argument info is required`);
+
+    const name = `ast-${info.id}`;
+
+    return await this.openai.beta.assistants.create({
+      name,
+      instructions: info.config.instructions,
+      model: info.config.model,
+      metadata: {},
+      tools: [{ type: 'file_search' }],
+      top_p: +info.config.topP || 1.0,
+      temperature: +info.config.temperature || 1.0,
+      response_format: RESPONSE_FORMATS[info.config.responseFormat] || 'auto'
+    });
+  }
+
+  public async update(info: AssistantInfo): Promise<AnyObject> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!info.refs?.openai?.id) throw new Error(`argument info.refs.openai.id is required`);
+
+    const assistant = await this.openai.beta.assistants.retrieve(info.refs.openai.id);
+    if (!assistant) throw new Error(`assistant ${info.refs.openai.id} not found`);
+
+    return await this.openai.beta.assistants.update(assistant.id, {
+      instructions: info.config.instructions,
+      model: info.config.model,
+      metadata: info.config.metadata || {},
+      top_p: +info.config.topP || 1.0,
+      temperature: +info.config.temperature || 1.0,
+      response_format: RESPONSE_FORMATS[info.config.responseFormat] || 'auto'
+    });
+  }
+
+  public async ensure(info: AssistantInfo): Promise<AnyObject> {
+    if (!info) throw new Error(`argument info is required`);
+
+    const assistant = info.refs?.openai?.id && (await this.openai.beta.assistants.retrieve(info.refs.openai.id));
+
+    if (!assistant) {
+      return await this.create(info);
+    } else {
+      const updateRequired = () => {
+        if (assistant.instructions !== info.refs.openai.instructions) return true;
+        if (assistant.model !== info.refs.openai.model) return true;
+        if (assistant.top_p !== info.refs.openai.top_p) return true;
+        if (assistant.temperature !== info.refs.openai.temperature) return true;
+        if (assistant.response_format !== info.refs.openai.response_format) return true;
+      };
+      if (!updateRequired) return null;
+      return await this.update(info);
+    }
+  }
+
+  public async remove(info: AssistantInfo): Promise<void> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!info.refs?.openai?.id) throw new Error(`argument info.refs.openai.id is required`);
+
+    const assistant = await this.openai.beta.assistants.retrieve(info.refs.openai.id);
+    if (!assistant) throw new Error(`assistant ${info.refs.openai.id} not found`);
+
+    await this.openai.beta.assistants.del(assistant.id);
+  }
+
+  public async addAttach(info: AssistantInfo, attach: Attach, filepath: string): Promise<AnyObject> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!attach) throw new Error(`argument attach is required`);
+    if (!filepath) throw new Error(`argument filepath is required`);
+    if (!info.refs?.openai?.id) throw new Error(`argument info.refs.openai.id is required`);
+
+    const assistant = await this.openai.beta.assistants.retrieve(info.refs.openai.id);
+    if (!assistant) throw new Error(`assistant ${info.refs.openai.id} not found`);
+
+    const vsid = assistant.metadata && assistant.metadata['vectorStoreId'];
+
+    const createVectorStore = async () => {
+      const vectorStore = await this.openai.beta.vectorStores.create({
+        name: `ast-${info.id}-vs`
+      });
+
+      await this.openai.beta.assistants.update(assistant.id, {
+        metadata: Object.assign({}, assistant.metadata, { vectorStoreId: vectorStore.id }),
+        tool_resources: { file_search: { vector_store_ids: [vectorStore.id] } }
+      });
+
+      return vectorStore;
+    };
+
+    const vectorStore = await (async (id) => {
+      if (!id) return await createVectorStore();
+
+      try {
+        return await this.openai.beta.vectorStores.retrieve(vsid);
+      } catch (err) {
+        if (err.status !== 404) throw err;
+      }
+
+      return await createVectorStore();
+    })(vsid);
+
+    const file = await this.openai.files.create({
+      file: fs.createReadStream(filepath),
+      purpose: 'assistants'
+    });
+
+    const vectorStoreFile = await this.openai.beta.vectorStores.files.create(vectorStore.id, {
+      file_id: file.id
+    });
+
+    return {
+      file,
+      vectorStoreFile
+    };
+  }
+
+  public async removeAttach(info: AssistantInfo, attach: Attach): Promise<void> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!attach) throw new Error(`argument attach is required`);
+    if (!attach.refs?.openai?.vectorStoreFile.id) throw new Error(`argument attach.refs.openai.vs.id is required`);
+    if (!attach.refs?.openai?.vectorStoreFile.vector_store_id) throw new Error(`argument attach.refs.openai.vector_store_id is required`);
+    if (!attach.refs?.openai?.file.id) throw new Error(`argument attach.refs.openai.file.id is required`);
+
+    const vectorStoreFile = await this.openai.beta.vectorStores.files.retrieve(
+      attach.refs.openai.vectorStoreFile.vector_store_id,
+      attach.refs.openai.vectorStoreFile.id
+    );
+    if (!vectorStoreFile) throw new Error(`vector store file ${attach.refs.openai.vectorStoreFile.id} not found`);
+
+    await this.openai.beta.vectorStores.files.del(attach.refs.openai.vectorStoreFile.vector_store_id, attach.refs.openai.vectorStoreFile.id);
+    await this.openai.files.del(attach.refs.openai.file.id);
+  }
+
+  public async ensureThread(info: AssistantInfo, thread: ThreadInfo): Promise<AnyObject> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!thread) throw new Error(`argument thread is required`);
+
+    return thread.refs?.openai?.id ? await this.openai.beta.threads.retrieve(thread.refs.openai.id) : await this.openai.beta.threads.create();
+  }
+
+  public async removeThread(info: AssistantInfo, thread: ThreadInfo): Promise<void> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!thread) throw new Error(`argument thread is required`);
+    if (!thread.refs?.openai?.id) throw new Error(`argument thread.refs.openai.id is required`);
+
+    await this.openai.beta.threads.del(thread.refs.openai.id);
+  }
+
+  public async removeAnswer(info: AssistantInfo, thread: ThreadInfo, answer: Answer): Promise<void> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!thread) throw new Error(`argument thread is required`);
+    if (!thread.refs?.openai?.id) throw new Error(`argument thread.refs.openai.id is required`);
+    if (!answer) throw new Error(`argument answer is required`);
+    if (!answer.raw.id) throw new Error(`argument answer.raw.id is required`);
+
+    await this.openai.beta.threads.messages.del(thread.refs.openai.id, answer.raw.id);
+  }
+
+  public async run(info: AssistantInfo, thread: ThreadInfo, attaches: Attach[], ask: Ask, streaming: boolean): Promise<RunResult> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!thread) throw new Error(`argument thread is required`);
+    if (!thread.refs?.openai?.id) throw new Error(`argument thread.refs.openai.id is required`);
+    if (!ask) throw new Error(`argument ask is required`);
+    if (!ask.prompt) throw new Error(`argument ask.prompt is required`);
+
+    const { model, instructions, prompt, files, temperature, maxPromptTokens, maxCompletionTokens, topP } = ask;
+
+    logger.info(`[${info.id}/${info.name}] thread run using "${model}"`);
+
+    const options = {
+      assistant_id: info.refs.openai.id,
+      stream: true,
+      model: info.config.model,
+      instructions: info.config.instructions,
+      temperature: +info.config.temperature || null,
+      max_prompt_tokens: +info.config.maxPromptTokens > 0 ? +info.config.maxPromptTokens : null,
+      max_completion_tokens: +info.config.maxCompletionTokens > 0 ? +info.config.maxCompletionTokens : null,
+      top_p: +info.config.topP || null
+    };
+    if (model) options.model = model;
+    if (instructions) options.instructions = instructions;
+    if (temperature) options.temperature = temperature;
+    if (maxPromptTokens || info.config?.maxPromptTokens) options.max_prompt_tokens = +maxPromptTokens || +info.config?.maxPromptTokens;
+    if (maxCompletionTokens || info.config?.maxCompletionTokens)
+      options.max_completion_tokens = +maxCompletionTokens || +info.config?.maxCompletionTokens;
+    if (topP) options.top_p = +topP;
+
+    await this.openai.beta.threads.messages.create(thread.refs.openai.id, {
+      role: 'user',
+      content: prompt
+    });
+
+    const stream = new PassThrough();
+
+    const result: RunResult = {
+      stream,
+      text: null,
+      object: null,
+      raw: {
+        message: null,
+        run: null
+      },
+      annotations: [],
+      usage: null,
+      summary: null
+    };
+
+    let error = null;
+
+    console.log('options', options);
+
+    try {
+      // run
+      this.openai.beta.threads.runs
+        .stream(thread.refs.openai.id, { ...options, stream: true })
+        .on('event', (event) => {
+          if (event.event === 'thread.run.created') {
+            result.raw.run = event.data;
+            stream.emit('provider.update', result);
+          } else if (event.event === 'thread.message.created') {
+            result.raw.message = event.data;
+            stream.emit('provider.update', result);
+          } else if (event.event === 'thread.message.completed') {
+            result.raw.message = event.data;
+            stream.emit('provider.update', result);
+          } else if (event.event === 'thread.run.completed') {
+            result.raw.run = event.data;
+            result.usage = {
+              prompt: event.data.usage.prompt_tokens,
+              answer: event.data.usage.completion_tokens,
+              total: event.data.usage.total_tokens
+            };
+            stream.emit('provider.update', result);
+          }
+        })
+        .on('error', (err) => {
+          if (!err) return;
+          error = err;
+          stream.emit('error', err);
+        })
+        .on('textDelta', (textDelta) => {
+          stream.write(textDelta.value);
+        })
+        .on('toolCallDelta', (toolCallDelta, snapshot) => {
+          if (toolCallDelta.type === 'code_interpreter') {
+            if (toolCallDelta.code_interpreter.input) {
+              stream.write(toolCallDelta.code_interpreter.input);
+            }
+            if (toolCallDelta.code_interpreter.outputs) {
+              stream.write('\n```\n');
+              toolCallDelta.code_interpreter.outputs.forEach((output) => {
+                if (output.type === 'logs') {
+                  stream.write(`\n${output.logs}\n`);
+                }
+              });
+              stream.write('\n```\n');
+            }
+          }
+        })
+        .on('messageDone', async (event) => {
+          if (event.content[0].type === 'text') {
+            const { text } = event.content[0];
+            const { annotations } = text;
+
+            for (let rawAnnotation of annotations) {
+              if (rawAnnotation?.type === 'file_citation') {
+                const fileid = rawAnnotation?.file_citation?.file_id;
+                // const citedFile = await this.openai.files.retrieve(rawAnnotation?.file_citation?.file_id);
+                // const filename = citedFile.filename;
+                const attach = attaches?.find((attach) => attach.refs?.openai?.file.id === fileid);
+
+                result.annotations.push({
+                  text: rawAnnotation.text,
+                  type: 'file',
+                  startIndex: rawAnnotation.start_index,
+                  endIndex: rawAnnotation.end_index,
+                  attach: {
+                    id: attach?.id,
+                    filename: attach?.filename,
+                    raw: {
+                      id: fileid,
+                      filename: attach?.filename
+                    }
+                  }
+                });
+              }
+            }
+
+            result.text = text.value;
+            result.summary = await this.summarize(`${result.text}`);
+          }
+
+          stream.emit('provider.complete');
+          stream.end();
+        });
+
+      if (streaming !== true) {
+        for await (const event of stream) {
+          // wait for complete
+        }
+
+        if (error) throw error;
+        result.summary = await this.summarize(`${result.text}`);
+      }
+    } catch (err) {
+      stream.emit('error', err);
+    }
+
+    return result;
+  }
+
+  public async cancelRun(info: AssistantInfo, thread: ThreadInfo): Promise<void> {
+    if (!info) throw new Error(`argument info is required`);
+    if (!thread) throw new Error(`argument thread is required`);
+    if (!thread.refs?.openai?.id) throw new Error(`argument thread.refs.openai.id is required`);
+
+    const runs = await this.openai.beta.threads.runs.list(thread.refs.openai.id);
+    const runId = runs?.data?.find((item) => ['queued', 'in_progress', 'incomplete'].includes(item.status)).id;
+
+    if (runId) {
+      await this.openai.beta.threads.runs.cancel(thread.refs.openai.id, runId);
+    }
+  }
+
+  public async summarize(text: string, model?: string): Promise<string> {
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: model || 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a helpful assistant that summarizes text within 20 characters.' },
+          { role: 'user', content: `Summarize this conversation in 4 words using the language used in the conversation: ${text}` }
+        ],
+        max_tokens: 100
+      });
+
+      const summary = (completion.choices[0].message.content || '').trim();
+      if (summary.endsWith('.')) return summary.substring(0, summary.length - 2);
+      return summary;
+    } catch (err) {
+      return `Error: ${err.message}`;
+    }
+  }
+}

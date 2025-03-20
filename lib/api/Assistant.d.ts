@@ -1,0 +1,57 @@
+import { AssistantInfo, ListFilter, DocumentList, IThread, AssistantConfig, Answer, ThreadInfo, IAssistant, IDataStore, Database, Model, Usage, AnyObject } from './spec';
+import { AIContext } from './AIContext';
+export declare class Assistant implements IAssistant {
+    private doc;
+    private context;
+    private tmpdir;
+    constructor(doc: AssistantInfo, context: AIContext);
+    get id(): string;
+    get name(): string;
+    get owner(): string;
+    get displayName(): string;
+    get config(): AssistantConfig;
+    get createdAt(): Date;
+    get updatedAt(): Date;
+    private get persist();
+    updateConfig(config: AssistantConfig): Promise<AssistantConfig>;
+    getProviderConfig(name: string): Promise<AnyObject>;
+    setProviderConfig(name: string, config: AnyObject): Promise<void>;
+    listModel(): Promise<Model[]>;
+    getModel(name: string): Promise<Model>;
+    upsertModel(name: string, values: Model): Promise<Model>;
+    removeModel(name: string): Promise<void>;
+    setModelEnabled(name: string, enable: boolean): Promise<void>;
+    getModelConfig(name: string): Promise<AnyObject>;
+    setModelConfig(name: string, config: AnyObject): Promise<void>;
+    removeModelConfig(name: string): Promise<void>;
+    listDataStore(): Promise<IDataStore[]>;
+    createDataStore(values: {
+        name: string;
+        owner: string;
+    }): Promise<IDataStore>;
+    getDataStore(id: string): Promise<IDataStore>;
+    removeDataStore(id: string): Promise<void>;
+    listThread(filter?: ListFilter): Promise<DocumentList<ThreadInfo>>;
+    getThread(id: string): Promise<IThread>;
+    createThread(owner: string): Promise<IThread>;
+    removeThread(id: string): Promise<void>;
+    listAnswer(filter: ListFilter): Promise<DocumentList<Answer>>;
+    getAnswer(id?: string): Promise<Answer>;
+    removeAnswer(id: string): Promise<void>;
+    listDatabase(): Promise<Database[]>;
+    addDatabase(database: Database): Promise<void>;
+    removeDatabase(id: string): Promise<void>;
+    listUsageByUser(uid: string, start: Date, end: Date, interval?: 'm' | 'h' | 'd' | string): Promise<Usage[]>;
+    listUsage(start: Date, end: Date, interval?: 'm' | 'h' | 'd' | string): Promise<Usage[]>;
+    toJSON(): {
+        id: string;
+        owner: string;
+        displayName: string;
+        name: string;
+        config: AssistantConfig;
+        info: AnyObject;
+        createdAt: Date;
+        updatedAt: Date;
+    };
+    toString(): string;
+}

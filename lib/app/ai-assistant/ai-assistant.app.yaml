@@ -1,0 +1,12 @@
+name: ai-assistant
+displayName: AI Assistant
+description: AI Assistant
+main: ai-assistant.js
+icon:
+  src: ai-assistant.svg
+  background: transparent
+  scale: 1
+  shape: circle
+categories:
+  - ai
+  - utility

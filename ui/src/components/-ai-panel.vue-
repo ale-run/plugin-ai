@@ -1,0 +1,420 @@
+<template>
+  <div class="ai-assistant flex flex-1 max-h-full" v-if="deployment">
+    <div class="hidden 2xl:flex flex-col min-w-300 border-r" v-if="!tab">
+      <div class="p-3">
+        <div class="flex items-center text-sm text-light font-normal rounded pl-2 pr-3 bg-input border border-light">
+          <IconSearch class="mr-3 flex-none" />
+          <input
+            type="text"
+            class="x-form-control x-form-control-sm border-0 m-0 p-0 w-full outline-none text-sm"
+            placeholder="검색하기"
+            style="min-height: 2.5rem"
+          />
+        </div>
+      </div>
+
+      <a class="btn btn-black block my-2 mx-3" @click="createThread()">새로운 쓰레드</a>
+
+      <div class="flex-1 flex flex-col">
+        <div class="flex-1 flex flex-col relative overflow-x-hidden overflow-y-auto scrollbar overscroll-y-contain">
+          <AIThreads
+            class="absolute top-0 bottom-0 right-0 left-0 max-w-full"
+            :data-deployment="deployment"
+            :data-threads="threads"
+            :data-thread="thread"
+            @select="onThreadSelected"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- center -->
+    <div class="flex-1 flex flex-col">
+      <!-- top bar -->
+      <div class="flex-0 py-3 px-5 mb-3 flex items-center">
+        <div class="flex-1 inline-flex items-center space-x-2">
+          <div class="2xl:hidden x-dropdown static xl:relative">
+            <a class="btn btn-sm py-[2px] px-4 btn-default m-0 font-semibold text-xs flex items-center" v-if="thread">
+              <span class="font-light mr-1">쓰레드 ›</span>
+              <span class="text-2xs text-active">{{ thread.displayName || thread.summary || '새로운 쓰레드' }}</span>
+            </a>
+            <a class="btn btn-sm py-[2px] px-4 btn-black m-0 font-semibold text-xs flex items-center" v-else>
+              <span class="font-light mr-1">새로운 쓰레드</span>
+            </a>
+            <div class="x-dropdown-items w-full xl:w-max px-5 xl:px-0">
+              <div class="x-contextmenu">
+                <div class="x-list x-list-hover min-w-full xl:min-w-500">
+                  <div class="px-3 my-3">
+                    <div
+                      class="x-dropdown-prevent-close w-full flex items-center text-sm text-light font-normal rounded pl-2 pr-3 bg-input border border-light"
+                    >
+                      <IconSearch class="mr-3 flex-none" />
+                      <input type="text" class="x-form-control border-0 m-0 p-0 w-full outline-none text-sm" placeholder="검색하기" />
+                    </div>
+
+                    <a class="btn btn-black block my-2 mx-0" @click="createThread()">새로운 쓰레드</a>
+                  </div>
+
+                  <template v-if="true">
+                    <AIThreads
+                      class="max-h-350 overflow-auto overscroll-contain"
+                      :data-deployment="deployment"
+                      :data-threads="threads"
+                      :data-thread="thread"
+                      @select="onThreadSelected"
+                    />
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="inline-flex items-center py-[2px] px-[2px] bg-btn text-xs font-semibold rounded-sm">
+          <a
+            class="cursor-pointer hover:text-primary py-1 px-3 rounded-sm"
+            :class="{
+              'bg-panel text-primary': !tab
+            }"
+            @click="setTab('')"
+          >
+            대화 내역
+          </a>
+          <a
+            class="cursor-pointer hover:text-primary py-1 px-3 rounded-sm"
+            :class="{
+              'bg-panel text-primary': tab === 'usage'
+            }"
+            @click="setTab('usage')"
+          >
+            사용량
+          </a>
+        </div>
+      </div>
+      <!-- // top bar -->
+
+      <!-- Chatting -->
+      <div class="flex-1 flex flex-col" v-if="!tab">
+        <div ref="chat" class="flex-1 flex flex-col relative overflow-y-auto scrollbar overscroll-y-contain">
+          <div class="absolute top-0 bottom-0 right-0 left-0 p-5">
+            <div class="space-y-5 pb-16">
+              <template v-for="answer in answers" :key="'sep' + answer.id">
+                <!-- line -->
+                <div class="py-10 text-xs flex items-center text-light">
+                  <div class="flex-1 h-1 border-t"></div>
+                  <div class="px-4">
+                    <XDate :value="answer.createdAt" format="yyyy.mm.dd (ddd)" />
+                  </div>
+                  <div class="flex-1 h-1 border-t"></div>
+                </div>
+                <!-- // chat -->
+
+                <AIAnswer :data-deployment="deployment" :data-thread="thread" :data-answer="answer" />
+              </template>
+            </div>
+          </div>
+        </div>
+        <div class="flex-0 border-t">
+          <div class="px-3 my-3">
+            <div class="w-full flex items-center text-sm text-light font-normal rounded-lg pl-2 pr-1 bg-input border border-light">
+              <IconPlus class="mx-2 flex-0" />
+              <textarea
+                class="flex-1 bg-transparent border-0 m-0 p-0 outline-none text-md leading-normal text-active font-medium my-3 resize-none"
+                placeholder="프롬프트를 입력하세요."
+                v-model="prompt"
+                :rows="promptLines"
+                @keypress.enter.prevent="submit"
+              ></textarea>
+
+              <a
+                class="btn btn-md btn-black rounded border-0 hover:bg-sky-500 hover:opacity-100"
+                :class="{
+                  'btn-disabled': processing || !prompt
+                }"
+                @click="submit()"
+                v-tooltip="`전송하기`"
+              >
+                <IconEnter />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- // Chatting -->
+
+      <!-- Usage -->
+      <div class="flex-1 flex flex-col p-5" v-else-if="tab === 'usage'">
+        <AIUsage :data-deployment="deployment" />
+      </div>
+      <!-- // Usage -->
+    </div>
+    <!-- // center -->
+  </div>
+</template>
+
+<script lang="ts">
+import { Component, Vue, Prop, Watch, Ref } from 'vue-property-decorator';
+import { IDeployment, Workbench } from '@ale-run/connector';
+import ai from '../client';
+import { IAssistant, IThread, ThreadInfo, Answer, StreamResponse, AskStreaming, ANSWER_STATUS } from '../client';
+
+import AIUsage from './ai-usage.vue';
+import AIThreads from './ai-threads.vue';
+import AIAnswer from './ai-answer.vue';
+
+import IconPlus from 'bootstrap-icons/icons/plus-lg.svg';
+import IconEnter from 'bootstrap-icons/icons/arrow-return-left.svg';
+import IconSearch from './assets/icons/search.svg';
+
+const XAppIcon = Workbench.components.get('XAppIcon');
+const XUserIcon = Workbench.components.get('XUserIcon');
+const XDate = Workbench.components.get('XDate');
+
+@Component({
+  components: {
+    AIUsage,
+    AIThreads,
+    AIAnswer,
+    XDate,
+    XAppIcon,
+    XUserIcon,
+    IconPlus,
+    IconEnter,
+    IconSearch
+  }
+})
+export default class AIAssistant extends Vue {
+  @Prop({ required: true }) public dataDeployment: IDeployment;
+  @Prop() public dataTab: string;
+
+  @Ref()
+  private chat: HTMLElement;
+
+  public deployment: IDeployment = null;
+  public tab = '';
+  public loaded = false;
+  public processing = false;
+  public scrollToBottomTimeout = null;
+
+  public prompt = '';
+  public promptLines = 1;
+
+  public assistant: IAssistant = null;
+  public thread: IThread = null;
+  public threads: ThreadInfo[] = null;
+  public answers: Answer[] = null;
+  public isComposing = false;
+  public lastScrollTop = 0;
+
+  @Watch('dataDeployment')
+  public async reload() {
+    try {
+      this.loaded = false;
+
+      if (!this.dataDeployment) throw new Error(`prop "dataDeployment" is required`);
+
+      const deployment = this.dataDeployment;
+      const assistant = await ai.getAssistant(deployment.id);
+
+      this.deployment = deployment;
+      this.assistant = assistant;
+
+      await this.reloadThread();
+    } catch (err) {
+      console.error(err);
+      this.$emit('error', err);
+      throw err;
+    } finally {
+      this.loaded = true;
+    }
+  }
+
+  public async reloadThread(threadid?: string) {
+    if (!this.assistant) return;
+
+    try {
+      this.loaded = false;
+
+      threadid = threadid || this.thread?.id;
+
+      const threadlist = await this.assistant.listThreads();
+      const thread = threadid
+        ? await this.assistant.getThread(threadid)
+        : threadlist?.rows?.length
+        ? await this.assistant.getThread(threadlist?.rows[0].id)
+        : null;
+      const answers = thread ? await thread.listAnswers() : null;
+
+      this.threads = threadlist?.rows;
+
+      this.thread = thread;
+      this.answers = answers?.rows;
+    } catch (err) {
+      console.error(err);
+      this.$emit('error', err);
+      throw err;
+    } finally {
+      this.loaded = true;
+      this.scrollToBottom();
+    }
+  }
+
+  public async mounted() {
+    this.tab = this.dataTab;
+    await this.reload();
+    this.chat?.addEventListener('scroll', this.handleScroll, { passive: true });
+  }
+
+  public async unmounted() {
+    this.chat?.removeEventListener('scroll', this.handleScroll);
+  }
+
+  @Watch('prompt')
+  public updatePromptLine() {
+    const promptLines = this.prompt?.split('\n').length;
+    this.promptLines = promptLines > 1 ? promptLines : 1;
+  }
+
+  public async submit(event?: any) {
+    if (!this.prompt) return;
+    if (this.processing) return Workbench.toast(`이미 처리 중입니다.`);
+
+    if (event?.shiftKey) {
+      this.prompt += '\n';
+      this.promptLines += 1;
+      return;
+    }
+
+    const prompt = this.prompt;
+
+    try {
+      this.scrollToBottom();
+
+      this.processing = true;
+      this.prompt = '';
+      this.promptLines = 1;
+
+      if (!this.thread) {
+        this.thread = await this.assistant.createThread();
+        if (!this.threads) this.threads = [];
+        this.threads.unshift(this.thread);
+      }
+    } catch (err) {
+      // Workbench.toast(err);
+      if (!this.answers) this.answers = [];
+      this.answers.push({
+        id: 'temporary',
+        assistantId: this.assistant?.id,
+        threadId: null,
+        status: ANSWER_STATUS.error,
+        error: err.message,
+        ask: {
+          prompt,
+          channel: 'dashboard'
+        },
+        createdAt: new Date()
+      });
+      this.processing = false;
+      this.scrollToBottom(10);
+      return;
+    }
+
+    const ask = {
+      streaming: true,
+      prompt,
+      channel: 'dashboard'
+    } as AskStreaming;
+
+    const answer = {
+      id: 'temporary',
+      assistantId: this.assistant.id,
+      threadId: this.thread.id,
+      status: ANSWER_STATUS.inprogress,
+      result: '',
+      ask,
+      createdAt: new Date()
+    } as Answer;
+
+    if (!this.answers) this.answers = [];
+    this.answers.push(answer);
+
+    try {
+      const stream: StreamResponse = await this.thread.run(ask);
+
+      this.scrollToBottom();
+
+      stream
+        .on('data', (data) => {
+          if (!data) return;
+          answer.result += data.toString();
+          this.scrollToBottom(10);
+        })
+        .on('error', async (err) => {
+          console.error(err);
+          this.processing = false;
+          await this.reloadThread();
+        })
+        .on('end', async () => {
+          this.processing = false;
+          await this.reloadThread();
+        });
+    } catch (err) {
+      console.error(err);
+      // Workbench.toast(err);
+      answer.error = err.message;
+      this.processing = false;
+      await this.reloadThread();
+    }
+  }
+
+  public async cancelRun() {
+    //
+  }
+
+  public async createThread() {
+    this.thread = null;
+    this.answers = null;
+  }
+
+  public setTab(tab: string) {
+    this.tab = tab || '';
+    this.$emit('tab', tab);
+
+    setTimeout(() => {
+      if (!tab && this.chat) {
+        this.chat.removeEventListener('scroll', this.handleScroll);
+        this.chat.addEventListener('scroll', this.handleScroll, { passive: true });
+        this.chat.scrollTop = this.lastScrollTop || this.chat.scrollHeight;
+      }
+    }, 10);
+  }
+
+  public handleScroll() {
+    if (!this.tab && this.chat) {
+      this.lastScrollTop = this.chat.scrollTop;
+    }
+  }
+
+  public onThreadSelected(thread) {
+    if (!thread.id) return;
+    this.reloadThread(thread.id);
+  }
+
+  private scrollToBottom(throttle?: number) {
+    if (!throttle && this.chat) this.chat.scrollTop = this.chat.scrollHeight;
+
+    if (this.scrollToBottomTimeout) clearTimeout(this.scrollToBottomTimeout);
+
+    this.scrollToBottomTimeout = setTimeout(() => {
+      if (this.chat) {
+        this.chat.scrollTop = this.chat.scrollHeight;
+        this.lastScrollTop = this.chat.scrollTop;
+      }
+    }, throttle || 10);
+  }
+
+  @Watch('dataTab')
+  private watchTab() {
+    this.setTab(this.dataTab);
+  }
+}
+</script>

@@ -1,0 +1,50 @@
+name: "@ale-run/plugin-ai"
+version: '0.1.0'
+displayName: Ale AI
+description: Ale Plugin - AI
+license: Ale License
+author: ale
+homepage: https://ale.run
+repository: ale-run/plugin-ai
+main: lib/index.js
+icon:
+  src: ale.svg
+  background: transparent
+  scale: 1
+  shape: circle
+ui:
+  libs:
+    - ./ui/dist/ai-assistant.umd.js
+    - ./ui/dist/ai-assistant.umd.js.map
+    - ./ui/dist/style.css
+  dev:
+    - ./ui/dist/ai-assistant.umd.js
+    - ./ui/dist/ai-assistant.umd.js.map
+    - ./ui/dist/style.css
+schema:
+  type: object
+  properties:
+    DB_URL:
+      title: DB URL (mongodb)
+      type: string
+      maxLength: 255
+      attrs:
+        placeholder: DB URL (mongodb)
+    TAVILY_API_KEY:
+      title: Tavily API Key
+      type: string
+      maxLength: 255
+      attrs:
+        placeholder: Tavily API Key
+    FIRECRAWL_API_KEY:
+      title: Firecrawl API Key
+      type: string
+      maxLength: 255
+      attrs:
+        placeholder: Firecrawl API Key
+    OPENAI_API_KEY:
+      title: OpenAI API Key
+      type: string
+      maxLength: 255
+      attrs:
+        placeholder: OpenAI API Key

@@ -1,0 +1,65 @@
+@import './markdown';
+
+@tailwind components;
+@tailwind utilities;
+
+.ai-assistant {
+  .markdown-body {
+    --borderColor-default: #d1d9e09a;
+    --borderColor-muted: #d1d9e0b3;
+    --fgColor-default: var(--color-text);
+    --bgColor-default: transparent;
+
+    pre {
+      @apply text-xs;
+
+      margin: 1em 0;
+    }
+
+    p {
+      @apply leading-relaxed;
+
+      margin-top: 0;
+      margin-bottom: 0;
+    }
+
+    table tr {
+      background: transparent;
+    }
+
+    table tr:nth-child(2n) {
+      background: rgba(127, 127, 127, 0.05);
+    }
+
+    ul,
+    ol {
+      padding-left: 1.5em;
+    }
+  }
+
+  code[class*='language-'],
+  pre[class*='language-'] {
+    @apply text-default;
+
+    text-shadow: none;
+  }
+
+  .token.operator,
+  .token.entity,
+  .token.url,
+  .language-css .token.string,
+  .style .token.string {
+    background: transparent;
+  }
+
+  .bi {
+    display: inline-block;
+    height: 1em;
+  }
+
+  .lucide {
+    width: 1em;
+    height: 1em;
+    stroke-width: 1.8;
+  }
+}

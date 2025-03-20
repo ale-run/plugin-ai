@@ -1,0 +1,63 @@
+.ai-assistant {
+  .markdown-body {
+    color: var(--color-text-active);
+
+    background: inherit;
+    color: inherit;
+    font-size: inherit;
+    text-align: inherit;
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5 {
+      @apply text-base font-medium text-pretty mt-10 mb-5 leading-relaxed tracking-tight;
+
+      border: none !important;
+    }
+
+    pre {
+      background-color: var(--color-bg-base);
+      color: var(--color-text-active);
+    }
+
+    blockquote {
+      @apply text-pretty mb-8;
+
+      border-left-width: 2px;
+    }
+
+    p {
+      @apply text-pretty leading-normal font-normal;
+    }
+
+    hr {
+      height: 1px;
+      background: var(--color-border);
+    }
+
+    img {
+      @apply rounded-lg;
+
+      min-height: 150px;
+    }
+
+    menu,
+    ol,
+    ul,
+    li {
+      list-style: initial;
+    }
+
+    .box {
+      @apply mt-5 p-10 min-h-400 max-h-400 bg-[#000000] rounded-lg overflow-hidden ring-1 ring-slate-400/10;
+
+      background-image: linear-gradient(-270deg, #0e0f18, #1e1f28, #21222d);
+
+      img {
+        @apply block shadow-lg min-w-600;
+      }
+    }
+  }
+}
