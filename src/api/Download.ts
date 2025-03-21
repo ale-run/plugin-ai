@@ -3,7 +3,6 @@ import { Readable, PassThrough, pipeline } from 'stream';
 import { createWriteStream } from 'fs';
 import { promisify } from 'util';
 import path from 'path';
-import pdf from 'pdf-parse';
 
 export const downloadAsStream = async (url: string): Promise<Readable> => {
   if (!url) throw new Error(`url is required`);
@@ -34,6 +33,8 @@ export const downloadAsDataURL = async (url: string): Promise<string> => {
   return `data:${contentType};base64,${base64String}`;
 };
 
+/*
+import pdf from 'pdf-parse';
 export const extractPdfContent = async (url: string): Promise<string> => {
   if (!url) throw new Error('url is required');
 
@@ -44,3 +45,4 @@ export const extractPdfContent = async (url: string): Promise<string> => {
   const pdfData = await pdf(buffer);
   return pdfData.text;
 };
+*/
